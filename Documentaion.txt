@@ -1,0 +1,265 @@
+
+# Django Project Deployment with Docker and PostgreSQL Setup on Ubuntu
+
+This documentation provides step-by-step instructions on deploying a Django project using Docker and configuring PostgreSQL on Ubuntu.
+
+---
+
+## **Step 1: Set Up PostgreSQL on Ubuntu**
+
+### 1.1 Install PostgreSQL
+Run the following commands to install PostgreSQL and the necessary dependencies:
+
+```bash
+# Update package lists
+sudo apt update
+
+# Install PostgreSQL and dependencies
+sudo apt install postgresql postgresql-contrib libpq-dev -y
+```
+
+### 1.2 Configure PostgreSQL Database and User
+Switch to the PostgreSQL user and create a database and user:
+
+```bash
+# Switch to the postgres user
+sudo -i -u postgres
+
+# Create the database
+psql -c "CREATE DATABASE mydatabase;"
+
+# Create a user and set a password
+psql -c "CREATE USER mydbuser WITH PASSWORD 'mypassword';"
+
+# Grant privileges to the user
+psql -c "GRANT ALL PRIVILEGES ON DATABASE mydatabase TO mydbuser;"
+
+# Exit the postgres shell
+exit
+```
+
+---
+
+## **Step 2: Configure PostgreSQL to Allow External Connections**
+
+### 2.1 Update PostgreSQL Configuration
+
+Edit the `postgresql.conf` file to allow connections from external IPs:
+
+```bash
+# Open the configuration file for editing
+sudo nano /etc/postgresql/<version>/main/postgresql.conf
+```
+
+Replace `<version>` with the installed PostgreSQL version (e.g., 14). Find and modify the following line:
+
+```bash
+#listen_addresses = 'localhost'
+```
+
+Change it to:
+
+```bash
+listen_addresses = '*'
+```
+
+### 2.2 Modify `pg_hba.conf`
+
+Edit the `pg_hba.conf` file to allow external access:
+
+```bash
+sudo nano /etc/postgresql/<version>/main/pg_hba.conf
+```
+
+Add this line at the bottom:
+
+```bash
+host    all             all             0.0.0.0/0            md5
+```
+
+### 2.3 Restart PostgreSQL
+
+Restart PostgreSQL to apply the changes:
+
+```bash
+sudo systemctl restart postgresql
+```
+
+### 2.4 Get Host's IP Address
+
+Use the following command to find your machine’s IP address:
+
+```bash
+hostname -I
+```
+
+Take note of the IP address (e.g., `192.168.1.100`).
+
+---
+
+## **Step 3: Configure the `.env` File for Django**
+
+Create and configure your `.env` file for the Django project with the following content:
+
+```env
+SECRET_KEY=kobl@t=yw9d*0y%jt2gjnq78=u!z_rrxb&w8e47l!(jz@m79zy
+DEBUG=False
+DB_NAME=mydatabase
+DB_USER=mydbuser
+DB_PASSWORD=mypassword
+DB_HOST=192.168.1.100  # Replace with your host's IP address
+DB_PORT=5432
+```
+
+---
+
+## **Step 4: Docker Installation on Ubuntu**
+
+### 4.1 Update Your System
+
+First, update your package index:
+
+```bash
+sudo apt update
+sudo apt upgrade -y
+```
+
+### 4.2 Install Required Packages
+
+Install the necessary prerequisites:
+
+```bash
+sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
+```
+
+### 4.3 Add Docker’s Official GPG Key
+
+Download and add the Docker GPG key:
+
+```bash
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+```
+
+### 4.4 Add Docker’s Official Repository
+
+Add Docker’s official repository to your system:
+
+```bash
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+```
+
+### 4.5 Install Docker
+
+Update your package list and install Docker:
+
+```bash
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io
+```
+
+### 4.6 Verify Docker Installation
+
+Check if Docker is installed and running:
+
+```bash
+sudo systemctl status docker
+```
+
+If Docker is inactive, start it:
+
+```bash
+sudo systemctl start docker
+```
+
+### 4.7 Add Your User to the Docker Group (Optional)
+
+To run Docker without `sudo`, add your user to the Docker group:
+
+```bash
+sudo usermod -aG docker $USER
+```
+
+**Note**: You’ll need to log out and back in for the group change to take effect. Alternatively, you can run:
+
+```bash
+newgrp docker
+```
+
+---
+
+## **Step 5: Dockerize Django Project**
+
+### 5.1 Dockerfile
+
+Ensure you have a `Dockerfile` in your project directory. Example:
+
+```Dockerfile
+# Use an official Python runtime as a parent image
+FROM python:3.9-slim
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update     && apt-get install -y libpq-dev gcc     && rm -rf /var/lib/apt/lists/*
+
+# Copy the current directory contents into the container
+COPY . /app/
+
+# Install Python dependencies
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+# Expose the port the app will run on
+EXPOSE 8000
+
+# Run the application
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+```
+
+### 5.2 Create the Docker Image
+
+Build the Docker image with the following command:
+
+```bash
+docker build -t django-app .
+```
+
+### 5.3 Run the Docker Container
+
+Run the Django project in a Docker container:
+
+```bash
+docker run -d -p 8000:8000 --env-file .env --name django-app django-app
+```
+
+This will:
+- Map port 8000 of the container to port 8000 on your host machine.
+- Use the `.env` file for environment variables.
+
+---
+
+## **Step 6: Access the Django Application**
+
+Once the container is running, you can access the Django application by visiting:
+
+```
+http://localhost:8000
+```
+
+---
+
+## **Step 7: Accessing PostgreSQL Database in Docker**
+
+Make sure your Django app is connected to the PostgreSQL database, and you can now manage data within the application. If you're using PostgreSQL in the container, you can access it by logging into the container:
+
+```bash
+docker exec -it django-app bash
+```
+
+Then use `psql` to interact with the database.
+
+---
+
+## Conclusion
+
+Your Django project is now set up with PostgreSQL and deployed using Docker on Ubuntu. You can modify your settings, rebuild the Docker container, and scale your application as needed.
