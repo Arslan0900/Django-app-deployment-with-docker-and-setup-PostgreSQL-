@@ -74,3 +74,6 @@ python manage.py runserver
 This project is part of a [series on YouTube](https://youtu.be/z4USlooVXG0) that teaches how to build an e-commerce website with Django.
 
 ---
+
+this is the an other link to deploy django application :
+https://www.digitalocean.com/community/tutorials/how-to-set-up-django-with-postgres-nginx-and-gunicorn-on-ubuntu
